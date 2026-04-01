@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resource Utilization Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+    background: #eef1f5; color: #1e293b; font-size: 13px; min-height: 100vh;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  input, select { font-family: inherit; outline: none; }
+
+  .toolbar {
+    background: #fff; border-bottom: 2px solid #cbd5e1;
+    padding: 10px 20px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 16px; }
+  .toolbar h1 { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.3px; }
+  .toolbar .meta { font-size: 11px; color: #64748b; }
+  .toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+  .btn {
+    padding: 5px 12px; border-radius: 3px; font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;
+  }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { background: #e2e8f0; color: #334155; border: 1px solid #cbd5e1; }
+  .btn-secondary:hover { background: #cbd5e1; }
+  .btn-danger { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+  .btn-danger:hover { background: #fecaca; }
+  .btn-sm { padding: 3px 8px; font-size: 10px; }
+
+  .sync-badge {
+    font-size: 10px; display: flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 3px; font-weight: 600;
+  }
+  .sync-ok { background: #dcfce7; color: #15803d; }
+  .sync-loading { background: #fef3c7; color: #b45309; }
+  .sync-err { background: #fee2e2; color: #dc2626; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+  .week-nav {
+    display: flex; align-items: center; gap: 4px;
+    background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px;
+  }
+  .week-nav button.arrow {
+    background: none; color: #64748b; padding: 3px 6px; border-radius: 3px;
+    display: flex; align-items: center;
+  }
+  .week-nav button.arrow:hover { background: #e2e8f0; color: #1e293b; }
+  .week-label { text-align: center; min-width: 170px; padding: 0 6px; }
+  .week-label .dates { font-size: 12px; font-weight: 600; color: #1e293b; }
+  .week-label .offset { font-size: 9px; color: #94a3b8; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .btn-today { font-size: 9px; padding: 2px 6px; background: #dbeafe; color: #2563eb; border-radius: 3px; font-weight: 600; }
+
+  .main { max-width: 1300px; margin: 0 auto; padding: 16px 20px; }
+
+  .overall-panel {
+    background: #fff; border: 1px solid #cbd5e1; border-radius: 4px;
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .overall-header {
+    background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    padding: 8px 14px; font-size: 11px; font-weight: 700;
+    color: #475569; text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .overall-body { padding: 14px; }
+  .overall-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .overall-row:last-child { margin-bottom: 0; }
+  .overall-row.total-row { padding-top: 8px; border-top: 1px solid #e2e8f0; margin-top: 4px; }
+  .overall-team-name { width: 210px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .overall-bar-track {
+    flex: 1; height: 18px; background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 3px; overflow: hidden;
+  }
+  .overall-bar-fill {
+    height: 100%; border-radius: 2px; transition: width 0.4s;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+    min-width: 30px;
+  }
+  .overall-bar-fill span { font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.3); }
+  .overall-hours { width: 90px; font-size: 11px; color: #64748b; text-align: right; flex-shrink: 0; }
+
+  .team-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid #cbd5e1;
+    background: #fff; border-radius: 4px 4px 0 0; overflow: hidden;
+  }
+  .team-tab {
+    flex: 1; padding: 9px 14px; font-size: 12px; font-weight: 600;
+    color: #64748b; background: #f8fafc; border: 1px solid #cbd5e1;
+    border-bottom: none; cursor: pointer; text-align: center;
+    transition: all 0.15s; position: relative;
+  }
+  .team-tab:not(:first-child) { border-left: none; }
+  .team-tab:hover { background: #fff; color: #1e293b; }
+  .team-tab.active { background: #fff; color: #1e293b; border-bottom: 2px solid #2563eb; margin-bottom: -2px; }
+  .tab-badge {
+    display: inline-block; background: #e2e8f0; color: #64748b;
+    font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px;
+  }
+  .team-tab.active .tab-badge { background: #dbeafe; color: #2563eb; }
+
+  .table-container {
+    background: #fff; border: 1px solid #cbd5e1; border-top: none;
+    border-radius: 0 0 4px 4px; overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #f1f5f9; border-bottom: 2px solid #cbd5e1;
+    padding: 7px 10px; text-align: left; font-size: 10px;
+    font-weight: 700; color: #475569; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid #e2e8f0; transition: background 0.1s; }
+  tbody tr:hover { background: #f8fafc; }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 8px 10px; vertical-align: top; }
+
+  .member-name-input {
+    font-size: 13px; font-weight: 600; color: #1e293b;
+    border: 1px solid transparent; background: transparent;
+    padding: 3px 6px; border-radius: 3px; width: 160px; transition: all 0.15s;
+  }
+  .member-name-input:hover { border-color: #cbd5e1; background: #f8fafc; }
+  .member-name-input:focus { border-color: #93c5fd; background: #fff; box-shadow: 0 0 0 2px #dbeafe; }
+
+  .avail-input {
+    width: 50px; text-align: center; font-size: 12px; font-weight: 600;
+    border: 1px solid #cbd5e1; border-radius: 3px; padding: 3px 4px;
+    background: #fff; color: #1e293b;
+  }
+  .avail-input:focus { border-color: #93c5fd; box-shadow: 0 0 0 2px #dbeafe; }
+
+  .util-cell { min-width: 130px; }
+  .util-bar-track {
+    height: 14px; background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 2px; overflow: hidden; margin-bottom: 2px;
+  }
+  .util-bar-fill { height: 100%; border-radius: 1px; transition: width 0.3s; }
+  .util-text { font-size: 10px; color: #64748b; }
+
+  .status {
+    font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 3px; display: inline-block; white-space: nowrap;
+  }
+  .status-green { background: #dcfce7; color: #15803d; }
+  .status-blue { background: #dbeafe; color: #1d4ed8; }
+  .status-amber { background: #fef3c7; color: #b45309; }
+  .status-red { background: #fee2e2; color: #dc2626; }
+  .status-grey { background: #f1f5f9; color: #64748b; }
+
+  .task-chips { display: flex; flex-wrap: wrap; gap: 4px; max-width: 340px; }
+  .task-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 3px;
+    padding: 2px 6px 2px 8px; font-size: 11px; color: #334155;
+  }
+  .task-chip .th { color: #2563eb; font-weight: 600; font-size: 10px; }
+  .task-chip button {
+    background: none; border: none; color: #94a3b8; padding: 0 1px;
+    font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center;
+  }
+  .task-chip button:hover { color: #dc2626; }
+
+  .add-task-inline {
+    color: #2563eb; font-size: 11px; font-weight: 600;
+    background: none; border: none; cursor: pointer; padding: 2px 0;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .add-task-inline:hover { text-decoration: underline; }
+
+  .table-footer {
+    border-top: 1px solid #e2e8f0; padding: 8px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f8fafc; flex-wrap: wrap; gap: 8px;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.4);
+    backdrop-filter: blur(2px); display: flex; align-items: center;
+    justify-content: center; z-index: 100;
+  }
+  .modal {
+    background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
+    padding: 20px 24px; min-width: 360px; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .modal h3 { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+  .modal .subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  .modal-input {
+    width: 100%; padding: 8px 10px; background: #fff;
+    border: 1px solid #cbd5e1; border-radius: 4px;
+    color: #1e293b; font-size: 13px;
+  }
+  .modal-input:focus { border-color: #93c5fd; box-shadow: 0 0 0 2px #dbeafe; }
+  .modal-input + .modal-input { margin-top: 8px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+  .loading-screen {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 60vh; gap: 12px; color: #64748b;
+  }
+  .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 900px) {
+    .overall-team-name { width: 130px; }
+    .team-tabs { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useCallback, useEffect, useRef } = React;
+
+// ─── Supabase Config ───
+const SUPABASE_URL = "https://vvuywbljgxdvrrwikigt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Ifz6c1NssZZ9ZCacyQcLQA_WQfK1OMI";
+const HEADERS = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": `Bearer ${SUPABASE_KEY}`,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation",
+};
+const API = `${SUPABASE_URL}/rest/v1`;
+
+async function sbGet(table, params = "") {
+  const res = await fetch(`${API}/${table}?${params}`, { headers: HEADERS });
+  if (!res.ok) throw new Error(`GET ${table}: ${res.status}`);
+  return res.json();
+}
+async function sbPost(table, data) {
+  const res = await fetch(`${API}/${table}`, {
+    method: "POST", headers: HEADERS, body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`POST ${table}: ${res.status}`);
+  return res.json();
+}
+async function sbPatch(table, params, data) {
+  const res = await fetch(`${API}/${table}?${params}`, {
+    method: "PATCH", headers: { ...HEADERS, "Prefer": "return=representation" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`PATCH ${table}: ${res.status}`);
+  return res.json();
+}
+async function sbDelete(table, params) {
+  const res = await fetch(`${API}/${table}?${params}`, {
+    method: "DELETE", headers: HEADERS,
+  });
+  if (!res.ok) throw new Error(`DELETE ${table}: ${res.status}`);
+}
+async function sbUpsert(table, data) {
+  const res = await fetch(`${API}/${table}`, {
+    method: "POST",
+    headers: { ...HEADERS, "Prefer": "return=representation,resolution=merge-duplicates" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`UPSERT ${table}: ${res.status}`);
+  return res.json();
+}
+
+// ─── Constants ───
+const MAX_HOURS = 40;
+const TEAM_NAMES = ["Process Engineering", "Industrial Engineering", "QA Architect / Virtual Factory"];
+const TEAM_BAR_COLORS = {
+  "Process Engineering": "#16a34a",
+  "Industrial Engineering": "#2563eb",
+  "QA Architect / Virtual Factory": "#ea580c",
+};
+
+function getWeekDates(offset) {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
+  const mon = new Date(d);
+  const fri = new Date(d); fri.setDate(mon.getDate() + 4);
+  return { mon, fri };
+}
+function fmtDate(d) { return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); }
+function weekKey(offset) {
+  const { mon } = getWeekDates(offset);
+  return mon.toISOString().slice(0, 10);
+}
+
+const I = {
+  Plus: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>,
+  Trash: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  Left: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  Right: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  X: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Refresh: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+};
+
+function App() {
+  const [members, setMembers] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [avail, setAvail] = useState([]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [activeTab, setActiveTab] = useState(TEAM_NAMES[0]);
+  const [modal, setModal] = useState(null);
+  const [formMember, setFormMember] = useState("");
+  const [formTask, setFormTask] = useState({ name: "", hours: "" });
+  const [syncStatus, setSyncStatus] = useState("loading"); // "ok" | "loading" | "error"
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  const wk = weekKey(weekOffset);
+  const { mon, fri } = getWeekDates(weekOffset);
+  const debounceTimers = useRef({});
+
+  // ─── Load all data ───
+  const loadData = useCallback(async () => {
+    setSyncStatus("loading");
+    try {
+      const [m, t, a] = await Promise.all([
+        sbGet("members", "order=created_at.asc"),
+        sbGet("tasks", `week_key=eq.${wk}&order=created_at.asc`),
+        sbGet("availability", `week_key=eq.${wk}`),
+      ]);
+      setMembers(m);
+      setTasks(t);
+      setAvail(a);
+      setSyncStatus("ok");
+      setInitialLoad(false);
+    } catch (e) {
+      console.error("Load error:", e);
+      setSyncStatus("error");
+      setInitialLoad(false);
+    }
+  }, [wk]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // ─── Derived data ───
+  const teamMembers = useCallback((team) => members.filter(m => m.team === team), [members]);
+
+  const getMemberTasks = useCallback((mid) => tasks.filter(t => t.member_id === mid), [tasks]);
+  const getMemberUsed = useCallback((mid) => getMemberTasks(mid).reduce((s, t) => s + parseFloat(t.hours), 0), [getMemberTasks]);
+
+  const getMemberAvail = useCallback((mid) => {
+    const rec = avail.find(a => a.member_id === mid);
+    return rec ? parseFloat(rec.hours) : MAX_HOURS;
+  }, [avail]);
+
+  const teamStats = useCallback((tn) => {
+    const ms = teamMembers(tn);
+    const cap = ms.reduce((s, m) => s + getMemberAvail(m.id), 0);
+    const used = ms.reduce((s, m) => s + getMemberUsed(m.id), 0);
+    return { cap, used, pct: cap ? Math.round((used / cap) * 100) : 0 };
+  }, [teamMembers, getMemberAvail, getMemberUsed]);
+
+  const allStats = TEAM_NAMES.map(tn => ({ name: tn, ...teamStats(tn) }));
+  const totalCap = allStats.reduce((s, t) => s + t.cap, 0);
+  const totalUsed = allStats.reduce((s, t) => s + t.used, 0);
+  const totalPct = totalCap ? Math.round((totalUsed / totalCap) * 100) : 0;
+
+  // ─── Actions ───
+  const renameMember = async (mid, newName) => {
+    if (!newName.trim()) return;
+    setMembers(prev => prev.map(m => m.id === mid ? { ...m, name: newName } : m));
+    clearTimeout(debounceTimers.current[mid]);
+    debounceTimers.current[mid] = setTimeout(async () => {
+      try {
+        await sbPatch("members", `id=eq.${mid}`, { name: newName.trim() });
+        setSyncStatus("ok");
+      } catch (e) { console.error("Rename error:", e); setSyncStatus("error"); }
+    }, 800);
+  };
+
+  const addMember = async () => {
+    if (!formMember.trim() || !modal) return;
+    const id = "m_" + Date.now();
+    const newMember = { id, name: formMember.trim(), team: modal.team };
+    setMembers(prev => [...prev, newMember]);
+    setFormMember(""); setModal(null);
+    try {
+      await sbPost("members", newMember);
+      setSyncStatus("ok");
+    } catch (e) { console.error("Add member error:", e); setSyncStatus("error"); loadData(); }
+  };
+
+  const removeMember = async (mid) => {
+    setMembers(prev => prev.filter(m => m.id !== mid));
+    setTasks(prev => prev.filter(t => t.member_id !== mid));
+    setAvail(prev => prev.filter(a => a.member_id !== mid));
+    try {
+      await sbDelete("members", `id=eq.${mid}`);
+      setSyncStatus("ok");
+    } catch (e) { console.error("Remove error:", e); setSyncStatus("error"); loadData(); }
+  };
+
+  const setMemberAvail = async (mid, val) => {
+    const v = Math.max(0, Math.min(MAX_HOURS, parseFloat(val) || 0));
+    setAvail(prev => {
+      const existing = prev.findIndex(a => a.member_id === mid && a.week_key === wk);
+      if (existing >= 0) {
+        const copy = [...prev]; copy[existing] = { ...copy[existing], hours: v }; return copy;
+      }
+      return [...prev, { member_id: mid, week_key: wk, hours: v }];
+    });
+    clearTimeout(debounceTimers.current["av_" + mid]);
+    debounceTimers.current["av_" + mid] = setTimeout(async () => {
+      try {
+        await sbUpsert("availability", { member_id: mid, week_key: wk, hours: v });
+        setSyncStatus("ok");
+      } catch (e) { console.error("Avail error:", e); setSyncStatus("error"); }
+    }, 600);
+  };
+
+  const addTask = async () => {
+    if (!formTask.name.trim() || !formTask.hours || !modal) return;
+    const h = Math.min(parseFloat(formTask.hours), MAX_HOURS);
+    if (isNaN(h) || h <= 0) return;
+    const newTask = { id: "t_" + Date.now(), member_id: modal.memberId, week_key: wk, name: formTask.name.trim(), hours: h };
+    setTasks(prev => [...prev, newTask]);
+    setFormTask({ name: "", hours: "" }); setModal(null);
+    try {
+      await sbPost("tasks", newTask);
+      setSyncStatus("ok");
+    } catch (e) { console.error("Add task error:", e); setSyncStatus("error"); loadData(); }
+  };
+
+  const removeTask = async (tid) => {
+    setTasks(prev => prev.filter(t => t.id !== tid));
+    try {
+      await sbDelete("tasks", `id=eq.${tid}`);
+      setSyncStatus("ok");
+    } catch (e) { console.error("Remove task error:", e); setSyncStatus("error"); loadData(); }
+  };
+
+  const statusOf = (pct) => {
+    if (pct >= 100) return { label: "Fully Loaded", cls: "status-red" };
+    if (pct >= 80) return { label: "Near Capacity", cls: "status-amber" };
+    if (pct >= 50) return { label: "Moderate", cls: "status-blue" };
+    if (pct > 0) return { label: "Available", cls: "status-green" };
+    return { label: "Unassigned", cls: "status-grey" };
+  };
+  const barColor = (pct) => pct >= 100 ? "#dc2626" : pct >= 80 ? "#d97706" : pct >= 50 ? "#2563eb" : "#16a34a";
+
+  // ─── Loading screen ───
+  if (initialLoad) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner"></div>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>Loading resource data...</div>
+        <div style={{ fontSize: 11, color: "#94a3b8" }}>Connecting to database</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="toolbar-left">
+          <div>
+            <h1>Resource Utilization Planner</h1>
+            <div className="meta mono">{members.length} members · {TEAM_NAMES.length} teams · {MAX_HOURS}h max/week</div>
+          </div>
+        </div>
+        <div className="toolbar-right">
+          <div className={`sync-badge ${syncStatus === "ok" ? "sync-ok" : syncStatus === "loading" ? "sync-loading" : "sync-err"}`}>
+            <span className="sync-dot" style={{ background: syncStatus === "ok" ? "#16a34a" : syncStatus === "loading" ? "#d97706" : "#dc2626" }}></span>
+            {syncStatus === "ok" ? "Synced" : syncStatus === "loading" ? "Syncing..." : "Sync Error"}
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={loadData} title="Refresh data from server">
+            {I.Refresh} Refresh
+          </button>
+          <div className="week-nav">
+            <button className="arrow" onClick={() => setWeekOffset(o => o - 1)}>{I.Left}</button>
+            <div className="week-label">
+              <div className="dates">{fmtDate(mon)} — {fmtDate(fri)}</div>
+              <div className="offset mono">{weekOffset === 0 ? "Current Week" : weekOffset > 0 ? `+${weekOffset} week${weekOffset>1?"s":""}` : `${weekOffset} week${weekOffset<-1?"s":""}`}</div>
+            </div>
+            <button className="arrow" onClick={() => setWeekOffset(o => o + 1)}>{I.Right}</button>
+            {weekOffset !== 0 && <button className="btn-today mono" onClick={() => setWeekOffset(0)}>Today</button>}
+          </div>
+        </div>
+      </div>
+
+      <div className="main">
+        {/* Overall Utilization */}
+        <div className="overall-panel">
+          <div className="overall-header">
+            <span>Overall Utilization — Week of {fmtDate(mon)}</span>
+            <span className="mono" style={{ fontSize: 12, color: totalPct > 90 ? "#dc2626" : totalPct > 60 ? "#d97706" : "#16a34a", fontWeight: 700 }}>
+              {totalPct}% Total
+            </span>
+          </div>
+          <div className="overall-body">
+            {allStats.map(t => (
+              <div className="overall-row" key={t.name}>
+                <div className="overall-team-name">{t.name}</div>
+                <div className="overall-bar-track">
+                  <div className="overall-bar-fill" style={{
+                    width: `${Math.max(Math.min(t.pct, 100), 3)}%`,
+                    background: TEAM_BAR_COLORS[t.name],
+                    opacity: t.pct > 90 ? 1 : 0.85,
+                  }}><span>{t.pct}%</span></div>
+                </div>
+                <div className="overall-hours mono">{t.used}h / {t.cap}h</div>
+              </div>
+            ))}
+            <div className="overall-row total-row">
+              <div className="overall-team-name" style={{ fontWeight: 700, color: "#0f172a" }}>All Teams</div>
+              <div className="overall-bar-track" style={{ background: "#e2e8f0" }}>
+                <div className="overall-bar-fill" style={{
+                  width: `${Math.max(Math.min(totalPct, 100), 3)}%`,
+                  background: totalPct > 90 ? "#dc2626" : totalPct > 60 ? "#d97706" : "#2563eb",
+                }}><span>{totalPct}%</span></div>
+              </div>
+              <div className="overall-hours mono" style={{ fontWeight: 700, color: "#0f172a" }}>{totalUsed}h / {totalCap}h</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Team Tabs */}
+        <div className="team-tabs">
+          {TEAM_NAMES.map(tn => {
+            const st = teamStats(tn);
+            return (
+              <div key={tn} className={`team-tab ${activeTab === tn ? "active" : ""}`} onClick={() => setActiveTab(tn)}>
+                {tn}
+                <span className="tab-badge">{teamMembers(tn).length}</span>
+                <span className="tab-badge mono">{st.pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Data Table */}
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 30 }}>#</th>
+                <th style={{ width: 180 }}>Member Name</th>
+                <th style={{ width: 95 }}>Avail (hrs)</th>
+                <th style={{ width: 75 }}>Assigned</th>
+                <th style={{ width: 80 }}>Remaining</th>
+                <th className="util-cell">Utilization</th>
+                <th style={{ width: 85 }}>Status</th>
+                <th>Tasks</th>
+                <th style={{ width: 55 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamMembers(activeTab).map((member, idx) => {
+                const av = getMemberAvail(member.id);
+                const used = getMemberUsed(member.id);
+                const remaining = Math.max(av - used, 0);
+                const pct = av ? Math.round((used / av) * 100) : 0;
+                const st = statusOf(pct);
+                const mt = getMemberTasks(member.id);
+                const bc = barColor(pct);
+
+                return (
+                  <tr key={member.id}>
+                    <td style={{ color: "#94a3b8", fontWeight: 600, fontSize: 11 }}>{idx + 1}</td>
+                    <td>
+                      <input
+                        className="member-name-input"
+                        value={member.name}
+                        onChange={e => renameMember(member.id, e.target.value)}
+                        title="Click to edit name"
+                      />
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                        <input
+                          className="avail-input mono"
+                          type="number" min="0" max={MAX_HOURS} step="1"
+                          value={av}
+                          onChange={e => setMemberAvail(member.id, e.target.value)}
+                          title="Available hours this week"
+                        />
+                        <span style={{ fontSize: 10, color: "#94a3b8" }}>h</span>
+                      </div>
+                      {av < MAX_HOURS && (
+                        <div style={{ fontSize: 9, color: "#d97706", marginTop: 2, fontWeight: 600 }}>
+                          {MAX_HOURS - av}h off
+                        </div>
+                      )}
+                    </td>
+                    <td><span className="mono" style={{ fontWeight: 600, color: used > 0 ? "#1e293b" : "#94a3b8" }}>{used}h</span></td>
+                    <td>
+                      <span className="mono" style={{ fontWeight: 600, color: remaining <= 0 ? "#dc2626" : remaining <= 8 ? "#d97706" : "#16a34a" }}>
+                        {remaining}h
+                      </span>
+                    </td>
+                    <td className="util-cell">
+                      <div className="util-bar-track">
+                        <div className="util-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: bc }} />
+                      </div>
+                      <div className="util-text mono">{pct}%</div>
+                    </td>
+                    <td><span className={`status ${st.cls}`}>{st.label}</span></td>
+                    <td>
+                      <div className="task-chips">
+                        {mt.map(task => (
+                          <span className="task-chip" key={task.id}>
+                            {task.name} <span className="th mono">{task.hours}h</span>
+                            <button onClick={() => removeTask(task.id)} title="Remove task">{I.X}</button>
+                          </span>
+                        ))}
+                        <button className="add-task-inline"
+                          onClick={() => setModal({ type: "addTask", team: activeTab, memberId: member.id, memberName: member.name })}
+                        >{I.Plus} Add</button>
+                      </div>
+                    </td>
+                    <td>
+                      <button className="btn btn-danger btn-sm"
+                        onClick={() => { if (confirm(`Remove ${member.name}?`)) removeMember(member.id); }}
+                        title="Remove member"
+                      >{I.Trash}</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {teamMembers(activeTab).length === 0 && (
+                <tr><td colSpan="9" style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>
+                  No members. Click "Add Member" below.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+
+          <div className="table-footer">
+            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: "addMember", team: activeTab })}>
+              {I.Plus} Add Member to {activeTab}
+            </button>
+            <div className="mono" style={{ fontSize: 11, color: "#64748b" }}>
+              Team Total: <strong style={{ color: "#1e293b" }}>{teamStats(activeTab).used}h</strong> / {teamStats(activeTab).cap}h
+              &nbsp;·&nbsp;
+              <strong style={{ color: barColor(teamStats(activeTab).pct) }}>{teamStats(activeTab).pct}% utilized</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {modal && (
+        <div className="modal-overlay" onClick={() => { setModal(null); setFormMember(""); setFormTask({ name: "", hours: "" }); }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            {modal.type === "addMember" ? (
+              <>
+                <h3>Add Team Member</h3>
+                <p className="subtitle">Adding to {modal.team}</p>
+                <input className="modal-input" autoFocus value={formMember}
+                  onChange={e => setFormMember(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addMember()}
+                  placeholder="Enter member name..." />
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => { setModal(null); setFormMember(""); }}>Cancel</button>
+                  <button className="btn btn-primary" onClick={addMember}>Add Member</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>Assign Task</h3>
+                <p className="subtitle">Assigning to {modal.memberName} · Available: {getMemberAvail(modal.memberId)}h</p>
+                <input className="modal-input" autoFocus value={formTask.name}
+                  onChange={e => setFormTask(t => ({ ...t, name: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && addTask()}
+                  placeholder="Task name..." />
+                <input className="modal-input" value={formTask.hours}
+                  onChange={e => setFormTask(t => ({ ...t, hours: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && addTask()}
+                  placeholder="Hours (e.g. 8)" type="number" min="0.5" max={MAX_HOURS} step="0.5" />
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => { setModal(null); setFormTask({ name: "", hours: "" }); }}>Cancel</button>
+                  <button className="btn btn-primary" onClick={addTask}>Assign Task</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+</script>
+</body>
+</html>
