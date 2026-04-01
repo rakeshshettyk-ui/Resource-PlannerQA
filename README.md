@@ -1,0 +1,4 @@
+1. Enterprise light theme — white background, grey table headers, blue primary buttons, bordered panels, tabbed team navigation, and a data-grid layout matching the style of your reference image.
+2. Weekly availability per member — each member row now has an editable "Avail (hrs)" field that defaults to 40h. If someone is on leave or holiday, just reduce it (e.g., set to 24h for a 2-day week). It also shows an amber "Xh off" indicator when availability is below 40. Utilization % and remaining hours are calculated against that member's actual availability for the week, not the full 40.
+Inline name editing — click any member name directly in the table to rename it. The field highlights on hover/focus so it's discoverable.
+Deployment is the same as before — rename to index.html and drop onto Netlify, GitHub Pages, or Vercel. Since it's a single self-contained HTML file with CDN dependencies only, no build step is needed.
